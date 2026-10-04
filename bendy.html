@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<base href="https://gcore.jsdelivr.net/gh/woahhcrackers/BATIMWeb@main/">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Bendy and the Ink Machine</title>
+	<link rel="shortcut icon" href="TemplateData/favicon.ico">
+	<link rel="stylesheet" href="TemplateData/style.css">
+	<script>
+		window.fileMergerConfig = {
+			files: [
+				{ name: "bend.data", parts: 29 },
+				{ name: "bend.wasm", parts: 2 },
+			],
+			basePath: "Build/",
+		};
+	</script>
+	<script src="https://gcore.jsdelivr.net/gh/woahhcrackers/BATIMWeb@main/merge.js"></script>
+	<style>
+		html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #231f20; }
+		#unity-container { position: fixed !important; inset: 0; width: 100% !important; height: 100% !important; }
+		#unity-canvas { display: block; width: 100% !important; height: 100% !important; }
+		#unity-footer { display: none !important; }
+		#load-error { position: fixed; inset: auto 12px 12px; z-index: 6; color: #fff; font: 14px sans-serif; text-align: center; }
+	</style>
+</head>
+<body>
+	<div id="unity-container" class="unity-desktop">
+		<canvas id="unity-canvas" width="1280" height="720" tabindex="-1" aria-label="Bendy and the Ink Machine"></canvas>
+		<div id="unity-loading-bar"><div id="unity-logo"></div><div id="unity-progress-bar-empty"><div id="unity-progress-bar-full"></div></div></div>
+		<div id="unity-warning" role="alert"></div>
+	</div>
+	<p id="loading-text" style="position:fixed;top:12px;left:0;z-index:5;width:100%;margin:0;color:#fff;text-align:center;pointer-events:none" role="status" aria-live="polite">Loading Bendy and the Ink Machine...</p>
+	<div id="load-error" role="alert"></div>
+	<script>
+		const canvas = document.querySelector("#unity-canvas");
+		const loadingBar = document.querySelector("#unity-loading-bar");
+		const progressBar = document.querySelector("#unity-progress-bar-full");
+		const loadingText = document.querySelector("#loading-text");
+		const loadError = document.querySelector("#load-error");
+		const buildUrl = "Build";
+		const loader = document.createElement("script");
+		loader.src = `${buildUrl}/bend.loader.js`;
+		loader.onerror = () => {
+			loadingText.textContent = "Bendy and the Ink Machine could not be loaded";
+			loadError.textContent = "Could not load the Unity game loader. Check your internet connection.";
+		};
+		loader.onload = () => {
+			const config = {
+				arguments: [],
+				dataUrl: `${buildUrl}/bend.data`,
+				frameworkUrl: `${buildUrl}/bend.framework.js`,
+				codeUrl: `${buildUrl}/bend.wasm`,
+				streamingAssetsUrl: "StreamingAssets",
+				companyName: "crackers",
+				productName: "Bendy and the Ink Machine",
+				productVersion: "0.0.2",
+				showBanner: (message, type) => {
+					const warning = document.querySelector("#unity-warning");
+					warning.textContent = message;
+					warning.style.display = "block";
+					warning.style.background = type === "error" ? "#b00020" : "#805b00";
+				},
+			};
+			if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) config.devicePixelRatio = 1;
+			loadingBar.style.display = "block";
+			window.createUnityInstance(canvas, config, (progress) => {
+				progressBar.style.width = `${100 * progress}%`;
+			}).then(() => {
+				loadingText.remove();
+				loadingBar.style.display = "none";
+			}).catch((error) => {
+				loadingText.textContent = "Bendy and the Ink Machine could not be loaded";
+				loadError.textContent = String(error);
+				console.error(error);
+			});
+		};
+		document.body.append(loader);
+	</script>
+</body>
+</html>

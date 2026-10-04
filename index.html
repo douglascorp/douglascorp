@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="theme-color" content="#ffffff">
+	<title>DouglasCorp Game Room</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<script>
+		try {
+			if (localStorage.getItem("sidequest-theme") === "dark") document.documentElement.dataset.theme = "dark";
+			const savedAccent = localStorage.getItem("sidequest-accent");
+			if (savedAccent === "rainbow") document.documentElement.dataset.accent = "rainbow";
+			else if (/^#[\da-f]{6}$/i.test(savedAccent)) document.documentElement.style.setProperty("--theme-color", savedAccent);
+		} catch {}
+	</script>
+	<style>
+		:root {
+			color-scheme: light;
+			--theme-color: #ff99cc;
+			--paper: #ffffff;
+			--ink: #222321;
+			--muted: #70716d;
+			--line: #d2d3ce;
+			--accent: color-mix(in srgb, var(--theme-color) 28%, white);
+			--accent-strong: color-mix(in srgb, var(--theme-color) 68%, black);
+			--hover: #f0f0f0;
+			--board: #f5f5f5;
+			--board-hover: #e9e9e9;
+			--surface: #ffffff;
+			--focus: #555652;
+			--button-bg: #292a27;
+			--button-text: #fafaf8;
+			--button-hover: #4b4c48;
+			--mark-x: #50514d;
+			--mark-o: #858681;
+			--texture: #e4e4e4;
+			--reaction-idle: #e1e2de;
+			--reaction-ready: #c5c6c0;
+			--reaction-early: #777873;
+			--match: #e2e3de;
+			font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+			font-synthesis: none;
+		}
+		:root[data-theme="dark"] {
+			color-scheme: dark;
+			--paper: #171816;
+			--ink: #ededeb;
+			--muted: #a3a49f;
+			--line: #41423e;
+			--accent: color-mix(in srgb, var(--theme-color) 38%, #171816);
+			--accent-strong: color-mix(in srgb, var(--theme-color) 42%, white);
+			--hover: #30312d;
+			--board: #292a27;
+			--board-hover: #383935;
+			--surface: #20211f;
+			--focus: #cecfca;
+			--button-bg: #e4e5df;
+			--button-text: #252623;
+			--button-hover: #c4c5bf;
+			--mark-x: #f1f1ed;
+			--mark-o: #a9aaa4;
+			--texture: #333430;
+			--reaction-idle: #333430;
+			--reaction-ready: #d6d7d1;
+			--reaction-early: #4b4c47;
+			--match: #383935;
+		}
+		:root[data-accent="rainbow"] {
+			--accent: linear-gradient(120deg, #ff0000, #ff9900, #ffff00, #33cc33, #6699ff, #9933ff, #ff99cc);
+			--accent-strong: #662d91;
+		}
+		:root[data-theme="dark"][data-accent="rainbow"] { --accent-strong: #f0d1ff; }
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			min-width: 320px;
+			min-height: 100vh;
+			color: var(--ink);
+			background-color: var(--paper);
+			background-image: radial-gradient(var(--texture) 0.7px, transparent 0.7px);
+			background-size: 18px 18px;
+		}
+		button { font: inherit; color: inherit; }
+		.shell { width: min(100% - 40px, 1040px); margin: 0 auto; }
+		.topbar {
+			height: 70px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			border-bottom: 1px solid var(--line);
+		}
+		.brand { display: flex; align-items: center; gap: 11px; font-weight: 700; }
+		.brand-mark {
+			width: 30px;
+			aspect-ratio: 1;
+			display: grid;
+			place-items: center;
+			background: var(--accent);
+			border: 1px solid var(--ink);
+			border-radius: 9px 9px 9px 2px;
+			font-size: 18px;
+			transform: rotate(-5deg);
+		}
+		.header-actions { display: flex; align-items: center; gap: 10px; }
+		.version { color: var(--muted); font: 11px "DM Mono", monospace; }
+		.theme-toggle, .color-theme-toggle, .fullscreen-toggle {
+			width: 38px;
+			height: 38px;
+			display: grid;
+			place-items: center;
+			border: 1px solid var(--line);
+			border-radius: 4px;
+			background: var(--surface);
+			cursor: pointer;
+		}
+		.theme-toggle { font-size: 19px; }
+		.color-theme-picker { position: relative; }
+		.color-theme-toggle:hover, .theme-toggle:hover, .fullscreen-toggle:hover { background: var(--hover); }
+		.color-theme-preview { width: 18px; height: 18px; border: 1px solid var(--ink); border-radius: 50%; background: var(--theme-color); }
+		:root[data-accent="rainbow"] .color-theme-preview { background: conic-gradient(#ff0000, #ff9900, #ffff00, #33cc33, #6699ff, #9933ff, #ff99cc, #ff0000); }
+		.color-theme-menu {
+			position: absolute;
+			top: calc(100% + 8px);
+			right: 0;
+			z-index: 10;
+			width: 164px;
+			padding: 12px;
+			display: grid;
+			grid-template-columns: repeat(5, 24px);
+			justify-content: space-between;
+			gap: 12px 8px;
+			border: 1px solid var(--ink);
+			background: var(--surface);
+			box-shadow: 4px 4px 0 var(--ink);
+		}
+		.color-theme-menu[hidden] { display: none; }
+		.color-theme-swatch {
+			width: 24px;
+			height: 24px;
+			padding: 0;
+			border: 1px solid color-mix(in srgb, var(--swatch) 70%, black);
+			border-radius: 50%;
+			background: var(--swatch);
+			cursor: pointer;
+		}
+		.color-theme-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+		.color-theme-swatch[data-color="rainbow"] { border-color: var(--ink); background: conic-gradient(#ff0000, #ff9900, #ffff00, #33cc33, #6699ff, #9933ff, #ff99cc, #ff0000); }
+		.theme-toggle[aria-pressed="true"] { background: var(--accent); }
+		main { padding: 40px 0 52px; }
+		.intro { margin-bottom: 25px; }
+		.eyebrow {
+			margin: 0 0 8px;
+			color: var(--accent-strong);
+			font: 11px "DM Mono", monospace;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+		h1 { margin: 0; font-size: clamp(34px, 5vw, 52px); line-height: 1; }
+		.picker {
+			display: grid;
+			grid-template-columns: repeat(8, minmax(0, 1fr));
+			gap: 1px;
+			padding: 1px;
+			border: 1px solid var(--ink);
+			background: var(--surface);
+			background: var(--line);
+		}
+		.game-tab {
+			min-height: 40px;
+			min-width: 0;
+			padding: 4px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 4px;
+			border: 0;
+			background: transparent;
+			cursor: pointer;
+			transition: background 140ms ease;
+		}
+		.game-tab:hover { background: var(--hover); }
+		.game-tab[aria-pressed="true"] { background: var(--accent); }
+		.tab-icon { display: none; }
+		.tab-label { min-width: 0; }
+		.tab-label strong { display: block; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+		.game-stage {
+			min-height: 470px;
+			padding: 24px 30px 28px;
+			background: var(--surface);
+			border: 1px solid var(--ink);
+			border-top: 0;
+			box-shadow: 5px 5px 0 var(--ink);
+		}
+		.game-panel[hidden] { display: none; }
+		.game-panel:fullscreen {
+			position: relative;
+			width: 100vw;
+			height: 100vh;
+			height: 100dvh;
+			min-height: 0;
+			padding: 0;
+			display: block;
+			overflow: hidden;
+			border: 0;
+			background: var(--surface);
+		}
+		.game-panel:fullscreen > .game-heading {
+			position: absolute;
+			top: 12px;
+			right: 12px;
+			z-index: 2;
+			min-height: 0;
+			border: 0;
+		}
+		.game-panel:fullscreen > .game-heading > div:first-child { display: none; }
+		.game-panel:fullscreen > .game-content { width: 100%; height: 100%; min-height: 0; padding: 0; }
+		.game-panel:fullscreen > .game-footer { display: none; }
+		.game-heading {
+			min-height: 48px;
+			display: flex;
+			align-items: start;
+			justify-content: space-between;
+			gap: 16px;
+			border-bottom: 1px solid var(--line);
+		}
+		.game-heading h2 { margin: 0 0 13px; font-size: 18px; }
+		.game-heading-tools { display: flex; align-items: center; gap: 10px; }
+		.round-label { color: var(--muted); font: 10px "DM Mono", monospace; text-transform: uppercase; }
+		.game-content { min-height: 350px; display: grid; place-items: center; padding: 24px 0 12px; }
+		.game-panel:fullscreen > .game-content { min-height: 0; }
+		.game-content.embedded-game-content { display: block; padding-top: 16px; }
+		.geography-content { position: relative; }
+		.geography-logo {
+			position: absolute;
+			right: 12px;
+			bottom: 12px;
+			z-index: 1;
+			width: 92px;
+			aspect-ratio: 1;
+		}
+		.geography-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+		.embedded-game {
+			width: 100%;
+			height: min(66vh, 620px);
+			min-height: 360px;
+			display: block;
+			border: 1px solid var(--line);
+			background: #080808;
+		}
+		.game-panel:fullscreen .embedded-game { height: 100%; min-height: 0; border: 0; }
+		.unity-game-container {
+			position: relative;
+			width: 100%;
+			height: min(66vh, 620px);
+			min-height: 360px;
+			overflow: hidden;
+			background: #000;
+		}
+		.unity-game-container canvas { width: 100% !important; height: 100% !important; }
+		.game-panel:fullscreen .unity-game-container { height: 100%; min-height: 0; }
+		.unity-loading {
+			position: absolute;
+			top: 20px;
+			left: 0;
+			width: 100%;
+			margin: 0;
+			font: bold 32px cursive;
+			text-align: center;
+			background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8f00ff);
+			background-size: 400% 400%;
+			background-clip: text;
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			animation: unity-rainbow 3s ease infinite;
+		}
+		.unity-loading[data-error="true"] { background: none; -webkit-text-fill-color: #fff; }
+		@keyframes unity-rainbow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+		.game-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+		.status { margin: 0; font-size: 14px; font-weight: 600; }
+		.substatus { margin: 5px 0 0; color: var(--muted); font: 11px "DM Mono", monospace; }
+		.action-button {
+			min-height: 38px;
+			padding: 0 14px;
+			border: 1px solid var(--ink);
+			border-radius: 3px;
+			background: var(--button-bg);
+			color: var(--button-text);
+			font-size: 12px;
+			font-weight: 600;
+			cursor: pointer;
+		}
+		.action-button:hover { background: var(--button-hover); }
+		.fullscreen-toggle { font-size: 20px; }
+		button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+		.tic-board {
+			width: min(100%, 300px);
+			aspect-ratio: 1;
+			display: grid;
+			grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+			gap: 8px;
+		}
+		.tic-cell {
+			display: grid;
+			place-items: center;
+			border: 1px solid var(--line);
+			border-radius: 4px;
+			background: var(--board);
+			font-size: clamp(40px, 9vw, 66px);
+			font-weight: 600;
+			cursor: pointer;
+		}
+		.tic-cell:hover:empty { background: var(--board-hover); }
+		.tic-cell[data-mark="X"] { color: var(--mark-x); }
+		.tic-cell[data-mark="O"] { color: var(--mark-o); }
+		.memory-board {
+			width: min(100%, 450px);
+			display: grid;
+			grid-template-columns: repeat(4, minmax(48px, 1fr));
+			gap: 9px;
+		}
+		.memory-card {
+			aspect-ratio: 1.18;
+			display: grid;
+			place-items: center;
+			border: 1px solid var(--ink);
+			border-radius: 4px;
+			background: var(--accent);
+			font-size: clamp(21px, 5vw, 34px);
+			cursor: pointer;
+		}
+		.memory-card[data-open="false"] { color: var(--accent-strong); font: 22px "DM Mono", monospace; }
+		.memory-card[data-open="true"] { background: var(--match); }
+		.memory-card:disabled { cursor: default; }
+		.reaction-pad {
+			width: min(100%, 480px);
+			min-height: 230px;
+			display: grid;
+			place-items: center;
+			border: 1px solid var(--ink);
+			border-radius: 4px;
+			background: var(--reaction-idle);
+			cursor: pointer;
+		}
+		.reaction-pad[data-state="ready"] { background: var(--reaction-ready); color: #252623; }
+		.reaction-pad[data-state="early"] { background: var(--reaction-early); color: var(--ink); }
+		.reaction-copy { display: grid; gap: 7px; text-align: center; }
+		.reaction-copy strong { font-size: 23px; }
+		.reaction-copy small { font: 11px "DM Mono", monospace; }
+		.cps-pad {
+			width: min(100%, 500px);
+			min-height: 230px;
+			display: grid;
+			place-items: center;
+			border: 1px solid var(--ink);
+			border-radius: 4px;
+			background: var(--board);
+			cursor: pointer;
+			user-select: none;
+		}
+		.cps-pad:hover:not(:disabled) { background: var(--board-hover); }
+		.cps-pad:disabled { cursor: default; }
+		.cps-copy { display: grid; gap: 8px; text-align: center; }
+		.cps-copy strong { font-size: 32px; }
+		.cps-copy small { color: var(--muted); font: 11px "DM Mono", monospace; }
+		.best-time { color: var(--muted); font: 10px "DM Mono", monospace; }
+		@media (max-width: 760px) {
+			.shell { width: min(100% - 28px, 1040px); }
+			main { padding: 30px 0 40px; }
+			.picker { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+			.game-stage { padding: 21px 18px 23px; }
+			.embedded-game { height: 60vh; min-height: 320px; }
+		}
+		@media (max-width: 420px) {
+			.picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+			.game-heading-tools { gap: 6px; }
+		}
+		@media (prefers-reduced-motion: reduce) {
+			*, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+		}
+	</style>
+</head>
+<body>
+	<div class="shell">
+		<header class="topbar">
+			<div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><span>DouglasCorp</span></div>
+			<div class="header-actions">
+				<span class="version">v0.4</span>
+				<div class="color-theme-picker">
+					<button class="color-theme-toggle" id="color-theme-toggle" type="button" aria-label="Choose color theme" aria-expanded="false" aria-controls="color-theme-menu" title="Choose color theme"><span class="color-theme-preview" aria-hidden="true"></span></button>
+					<div class="color-theme-menu" id="color-theme-menu" role="group" aria-label="Color themes" hidden>
+						<button class="color-theme-swatch" type="button" data-color="#ff99cc" style="--swatch: #ff99cc" aria-label="#ff99cc" title="#ff99cc" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#ffff99" style="--swatch: #ffff99" aria-label="#ffff99" title="#ffff99" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#9933ff" style="--swatch: #9933ff" aria-label="#9933ff" title="#9933ff" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#6699ff" style="--swatch: #6699ff" aria-label="#6699ff" title="#6699ff" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#0033cc" style="--swatch: #0033cc" aria-label="#0033cc" title="#0033cc" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#33cc33" style="--swatch: #33cc33" aria-label="#33cc33" title="#33cc33" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#cc3300" style="--swatch: #cc3300" aria-label="#cc3300" title="#cc3300" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#661a00" style="--swatch: #661a00" aria-label="#661a00" title="#661a00" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#ffccff" style="--swatch: #ffccff" aria-label="#ffccff" title="#ffccff" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="#cc00ff" style="--swatch: #cc00ff" aria-label="#cc00ff" title="#cc00ff" aria-pressed="false"></button>
+						<button class="color-theme-swatch" type="button" data-color="rainbow" aria-label="Rainbow" title="Rainbow" aria-pressed="false"></button>
+					</div>
+				</div>
+				<button class="theme-toggle" id="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" title="Dark mode"><span aria-hidden="true">☾</span></button>
+			</div>
+		</header>
+		<main>
+			<section class="intro"><p class="eyebrow">DouglasCorp Game Room</p><h1>Play something.</h1></section>
+			<nav class="picker" aria-label="Choose a game">
+				<button class="game-tab" type="button" data-game="tic" aria-pressed="true"><span class="tab-icon" aria-hidden="true">✳</span><span class="tab-label"><strong>Tic-Tac-Toe</strong></span></button>
+				<button class="game-tab" type="button" data-game="memory" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▦</span><span class="tab-label"><strong>Memory Match</strong></span></button>
+				<button class="game-tab" type="button" data-game="reaction" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◷</span><span class="tab-label"><strong>Quick Reflex</strong></span></button>
+				<button class="game-tab" type="button" data-game="cps" aria-pressed="false"><span class="tab-icon" aria-hidden="true">#</span><span class="tab-label"><strong>CPS Tester</strong></span></button>
+				<button class="game-tab" type="button" data-game="jsab" aria-pressed="false"><span class="tab-icon" aria-hidden="true">↗</span><span class="tab-label"><strong>Doodle Jump</strong></span></button>
+				<button class="game-tab" type="button" data-game="minus3" aria-pressed="false"><span class="tab-icon" aria-hidden="true">♟</span><span class="tab-label"><strong>Chess</strong></span></button>
+				<button class="game-tab" type="button" data-game="minus-three" aria-pressed="false"><span class="tab-icon" aria-hidden="true">−3</span><span class="tab-label"><strong>-3</strong></span></button>
+				<button class="game-tab" type="button" data-game="minusb" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◎</span><span class="tab-label"><strong>Angry Birds Classic</strong></span></button>
+				<button class="game-tab" type="button" data-game="geography" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◎</span><span class="tab-label"><strong>Angry Birds</strong></span></button>
+				<button class="game-tab" type="button" data-game="2048" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▦</span><span class="tab-label"><strong>2048</strong></span></button>
+				<button class="game-tab" type="button" data-game="2048-merge-run" aria-pressed="false"><span class="tab-icon" aria-hidden="true">↗</span><span class="tab-label"><strong>2048 Merge Run</strong></span></button>
+				<button class="game-tab" type="button" data-game="dino" aria-pressed="false"><span class="tab-icon" aria-hidden="true">♞</span><span class="tab-label"><strong>Google Dino</strong></span></button>
+				<button class="game-tab" type="button" data-game="trap-cat" aria-pressed="false"><span class="tab-icon" aria-hidden="true">⬡</span><span class="tab-label"><strong>Trap the Cat</strong></span></button>
+				<button class="game-tab" type="button" data-game="agar" aria-pressed="false"><span class="tab-icon" aria-hidden="true">●</span><span class="tab-label"><strong>Agar.io Lite</strong></span></button>
+				<button class="game-tab" type="button" data-game="sand" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▧</span><span class="tab-label"><strong>Sand Game</strong></span></button>
+				<button class="game-tab" type="button" data-game="wordle" aria-pressed="false"><span class="tab-icon" aria-hidden="true">W</span><span class="tab-label"><strong>Wordle</strong></span></button>
+				<button class="game-tab" type="button" data-game="opposite" aria-pressed="false"><span class="tab-icon" aria-hidden="true">↔</span><span class="tab-label"><strong>Opposite Day</strong></span></button>
+				<button class="game-tab" type="button" data-game="evil-glitch" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✹</span><span class="tab-label"><strong>Evil Glitch</strong></span></button>
+				<button class="game-tab" type="button" data-game="minus-b" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✎</span><span class="tab-label"><strong>Minus B</strong></span></button>
+				<button class="game-tab" type="button" data-game="sixty-seconds" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◷</span><span class="tab-label"><strong>60 Seconds</strong></span></button>
+				<button class="game-tab" type="button" data-game="celeste" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▲</span><span class="tab-label"><strong>Celeste</strong></span></button>
+				<button class="game-tab" type="button" data-game="just-shapes-beats" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◈</span><span class="tab-label"><strong>Just Shapes &amp; Beats</strong></span></button>
+				<button class="game-tab" type="button" data-game="hollow-knight" aria-pressed="false"><span class="tab-icon" aria-hidden="true">♞</span><span class="tab-label"><strong>Hollow Knight</strong></span></button>
+				<button class="game-tab" type="button" data-game="nes-player" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▰</span><span class="tab-label"><strong>NES Player</strong></span></button>
+				<button class="game-tab" type="button" data-game="famidash" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▰</span><span class="tab-label"><strong>Famidash</strong></span></button>
+				<button class="game-tab" type="button" data-game="pokemon-emerald" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◆</span><span class="tab-label"><strong>Pokemon Emerald</strong></span></button>
+				<button class="game-tab" type="button" data-game="eaglercraft-112" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▣</span><span class="tab-label"><strong>Eaglercraft 1.12</strong></span></button>
+				<button class="game-tab" type="button" data-game="scp-containment-breach" aria-pressed="false"><span class="tab-icon" aria-hidden="true">⚠</span><span class="tab-label"><strong>SCP: Containment Breach</strong></span></button>
+				<button class="game-tab" type="button" data-game="adofai" aria-pressed="false"><span class="tab-icon" aria-hidden="true">♫</span><span class="tab-label"><strong>A Dance of Fire and Ice</strong></span></button>
+				<button class="game-tab" type="button" data-game="difficult-climb" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▲</span><span class="tab-label"><strong>A Difficult Game About Climbing</strong></span></button>
+				<button class="game-tab" type="button" data-game="ages-of-conflict" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◎</span><span class="tab-label"><strong>Ages of Conflict</strong></span></button>
+				<button class="game-tab" type="button" data-game="backrooms" aria-pressed="false"><span class="tab-icon" aria-hidden="true">▧</span><span class="tab-label"><strong>Backrooms</strong></span></button>
+				<button class="game-tab" type="button" data-game="baldi-classic" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✎</span><span class="tab-label"><strong>Baldi's Basics</strong></span></button>
+				<button class="game-tab" type="button" data-game="baldi-remastered" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✎</span><span class="tab-label"><strong>Baldi's Basics Remastered</strong></span></button>
+				<button class="game-tab" type="button" data-game="baldi-plus" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✎</span><span class="tab-label"><strong>Baldi's Basics Plus</strong></span></button>
+				<button class="game-tab" type="button" data-game="caseohs-basics" aria-pressed="false"><span class="tab-icon" aria-hidden="true">🍔</span><span class="tab-label"><strong>CaseOhs Basics</strong></span></button>
+				<button class="game-tab" type="button" data-game="crazy-chicken-3d" aria-pressed="false"><span class="tab-icon" aria-hidden="true">🐔</span><span class="tab-label"><strong>Crazy Chicken 3D</strong></span></button>
+				<button class="game-tab" type="button" data-game="baldi-webport" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✎</span><span class="tab-label"><strong>BALDI</strong></span></button>
+				<button class="game-tab" type="button" data-game="basket-random" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◉</span><span class="tab-label"><strong>Basket Random</strong></span></button>
+				<button class="game-tab" type="button" data-game="bendy" aria-pressed="false"><span class="tab-icon" aria-hidden="true">◆</span><span class="tab-label"><strong>Bendy and the Ink Machine</strong></span></button>
+				<button class="game-tab" type="button" data-game="bit-planes" aria-pressed="false"><span class="tab-icon" aria-hidden="true">✈</span><span class="tab-label"><strong>Bit Planes</strong></span></button>
+			</nav>
+			<section class="game-stage">
+				<section class="game-panel" id="panel-tic" aria-labelledby="tic-title">
+					<div class="game-heading"><div><h2 id="tic-title">Tic-Tac-Toe</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content"><div class="tic-board" id="tic-board" role="grid" aria-label="Tic-Tac-Toe board"></div></div>
+					<div class="game-footer"><div><p class="status" id="tic-status" aria-live="polite">X goes first</p><p class="substatus">Take turns with a friend</p></div><button class="action-button" id="tic-reset" type="button">New round</button></div>
+				</section>
+				<section class="game-panel" id="panel-memory" aria-labelledby="memory-title" hidden>
+					<div class="game-heading"><div><h2 id="memory-title">Memory Match</h2></div><div class="game-heading-tools"><span class="round-label" id="memory-moves">0 moves</span><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content"><div class="memory-board" id="memory-board" aria-label="Memory cards"></div></div>
+					<div class="game-footer"><div><p class="status" id="memory-status" aria-live="polite">Find all six pairs</p><p class="substatus">Flip two cards at a time</p></div><button class="action-button" id="memory-reset" type="button">Shuffle cards</button></div>
+				</section>
+				<section class="game-panel" id="panel-reaction" aria-labelledby="reaction-title" hidden>
+					<div class="game-heading"><div><h2 id="reaction-title">Quick Reflex</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content"><button class="reaction-pad" id="reaction-pad" type="button" data-state="idle" aria-label="Start reaction test"><span class="reaction-copy"><strong id="reaction-prompt">Tap to start</strong><small id="reaction-hint">Wait for the signal, then tap fast</small></span></button></div>
+					<div class="game-footer"><div><p class="status" id="reaction-status" aria-live="polite">Ready when you are</p><p class="substatus">False starts don't count</p></div><span class="best-time" id="best-time">BEST  --</span></div>
+				</section>
+				<section class="game-panel" id="panel-cps" aria-labelledby="cps-title" hidden>
+					<div class="game-heading"><div><h2 id="cps-title">CPS Tester</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content"><button class="cps-pad" id="cps-pad" type="button"><span class="cps-copy"><strong id="cps-count">Click to start</strong><small id="cps-timer">Click as fast as you can for 5 seconds</small></span></button></div>
+					<div class="game-footer"><div><p class="status" id="cps-status" aria-live="polite">Ready when you are</p><p class="substatus">Your first click starts the timer</p></div><div class="game-heading-tools"><span class="best-time" id="cps-best">BEST  --</span><button class="action-button" id="cps-reset" type="button">Reset</button></div></div>
+				</section>
+				<section class="game-panel" id="panel-jsab" aria-labelledby="jsab-title" hidden>
+					<div class="game-heading"><div><h2 id="jsab-title">Doodle Jump</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/doodle-jump.html" title="Doodle Jump game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-minus3" aria-labelledby="minus3-title" hidden>
+					<div class="game-heading"><div><h2 id="minus3-title">Chess</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/chess.html" title="Chess game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-minus-three" aria-labelledby="minus-three-title" hidden>
+					<div class="game-heading"><div><h2 id="minus-three-title">-3</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="minus-three.html" title="-3 game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-minusb" aria-labelledby="minusb-title" hidden>
+					<div class="game-heading"><div><h2 id="minusb-title">Angry Birds Classic</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/angry-birds.html" title="Angry Birds Classic game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-geography" aria-labelledby="geography-title" hidden>
+					<div class="game-heading"><div><h2 id="geography-title">Angry Birds</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content geography-content">
+						<iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/angry-birds.html" title="Angry Birds game player" allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer"></iframe>
+					</div>
+				</section>
+				<section class="game-panel" id="panel-2048" aria-labelledby="2048-title" hidden>
+					<div class="game-heading"><div><h2 id="2048-title">2048</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/2048.html" title="2048 game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-2048-merge-run" aria-labelledby="2048-merge-run-title" hidden>
+					<div class="game-heading"><div><h2 id="2048-merge-run-title">2048 Merge Run</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="2048-merge-run.html" title="2048 Merge Run game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-dino" aria-labelledby="dino-title" hidden>
+					<div class="game-heading"><div><h2 id="dino-title">Google Dino</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/google-dino.html" title="Google Dino game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-trap-cat" aria-labelledby="trap-cat-title" hidden>
+					<div class="game-heading"><div><h2 id="trap-cat-title">Trap the Cat</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/trap-the-cat.html" title="Trap the Cat game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-agar" aria-labelledby="agar-title" hidden>
+					<div class="game-heading"><div><h2 id="agar-title">Agar.io Lite</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/agar-io-lite.html" title="Agar.io Lite game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-sand" aria-labelledby="sand-title" hidden>
+					<div class="game-heading"><div><h2 id="sand-title">Sand Game</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/sand-game.html" title="Sand Game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-wordle" aria-labelledby="wordle-title" hidden>
+					<div class="game-heading"><div><h2 id="wordle-title">Wordle Unlimited</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/wordle-unlimited.html" title="Wordle Unlimited game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-opposite" aria-labelledby="opposite-title" hidden>
+					<div class="game-heading"><div><h2 id="opposite-title">Opposite Day</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/opposite-day.html" title="Opposite Day game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-evil-glitch" aria-labelledby="evil-glitch-title" hidden>
+					<div class="game-heading"><div><h2 id="evil-glitch-title">Evil Glitch</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="https://raw.githack.com/douglascorp/Offline-HTML-Games-Pack/master/offline/evil-glitch.html" title="Evil Glitch game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-minus-b" aria-labelledby="minus-b-title" hidden>
+					<div class="game-heading"><div><h2 id="minus-b-title">Minus B</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><div class="unity-game-container" id="minus-b-container"><p class="unity-loading" id="minus-b-loading" role="status" aria-live="polite">Select Minus B to load</p></div></div>
+				</section>
+				<section class="game-panel" id="panel-sixty-seconds" aria-labelledby="sixty-seconds-title" hidden>
+					<div class="game-heading"><div><h2 id="sixty-seconds-title">60 Seconds</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="sixty-seconds.html" title="60 Seconds game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-celeste" aria-labelledby="celeste-title" hidden>
+					<div class="game-heading"><div><h2 id="celeste-title">Celeste</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="celeste.html" title="Celeste game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-just-shapes-beats" aria-labelledby="just-shapes-beats-title" hidden>
+					<div class="game-heading"><div><h2 id="just-shapes-beats-title">Just Shapes &amp; Beats</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="just-shapes-beats.html" title="Just Shapes and Beats game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-hollow-knight" aria-labelledby="hollow-knight-title" hidden>
+					<div class="game-heading"><div><h2 id="hollow-knight-title">Hollow Knight</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="hollow-knight.html" title="Hollow Knight game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-nes-player" aria-labelledby="nes-player-title" hidden>
+					<div class="game-heading"><div><h2 id="nes-player-title">NES Player</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="nes-player.html" title="NES emulator player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-famidash" aria-labelledby="famidash-title" hidden>
+					<div class="game-heading"><div><h2 id="famidash-title">Famidash</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="famidash.html" title="Famidash game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-pokemon-emerald" aria-labelledby="pokemon-emerald-title" hidden>
+					<div class="game-heading"><div><h2 id="pokemon-emerald-title">Pokemon Emerald</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="pokemon-emerald.html" title="Pokemon Emerald game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-eaglercraft-112" aria-labelledby="eaglercraft-112-title" hidden>
+					<div class="game-heading"><div><h2 id="eaglercraft-112-title">Eaglercraft 1.12</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="eaglercraft-112.html" title="Eaglercraft 1.12 game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-scp-containment-breach" aria-labelledby="scp-containment-breach-title" hidden>
+					<div class="game-heading"><div><h2 id="scp-containment-breach-title">SCP: Containment Breach</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="scp-containment-breach.html" title="SCP: Containment Breach game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-adofai" aria-labelledby="adofai-title" hidden>
+					<div class="game-heading"><div><h2 id="adofai-title">A Dance of Fire and Ice</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="a-dance-of-fire-and-ice.html" title="A Dance of Fire and Ice game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-difficult-climb" aria-labelledby="difficult-climb-title" hidden>
+					<div class="game-heading"><div><h2 id="difficult-climb-title">A Difficult Game About Climbing</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="a-difficult-game-about-climbing.html" title="A Difficult Game About Climbing player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-ages-of-conflict" aria-labelledby="ages-of-conflict-title" hidden>
+					<div class="game-heading"><div><h2 id="ages-of-conflict-title">Ages of Conflict</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="ages-of-conflict.html" title="Ages of Conflict game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-backrooms" aria-labelledby="backrooms-title" hidden>
+					<div class="game-heading"><div><h2 id="backrooms-title">Backrooms</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="backrooms.html" title="Backrooms game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-baldi-classic" aria-labelledby="baldi-classic-title" hidden>
+					<div class="game-heading"><div><h2 id="baldi-classic-title">Baldi's Basics</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="baldi-basics.html" title="Baldi's Basics game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-baldi-remastered" aria-labelledby="baldi-remastered-title" hidden>
+					<div class="game-heading"><div><h2 id="baldi-remastered-title">Baldi's Basics Classic Remastered</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="baldi-remastered.html" title="Baldi's Basics Classic Remastered game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-baldi-plus" aria-labelledby="baldi-plus-title" hidden>
+					<div class="game-heading"><div><h2 id="baldi-plus-title">Baldi's Basics Plus</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="baldi-plus.html" title="Baldi's Basics Plus game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-baldi-webport" aria-labelledby="baldi-webport-title" hidden>
+					<div class="game-heading"><div><h2 id="baldi-webport-title">BALDI</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="baldi-webport.html" title="BALDI game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-caseohs-basics" aria-labelledby="caseohs-basics-title" hidden>
+					<div class="game-heading"><div><h2 id="caseohs-basics-title">CaseOhs Basics in Eating and Fast Food</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="caseohs-basics.html" title="CaseOhs Basics game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-crazy-chicken-3d" aria-labelledby="crazy-chicken-3d-title" hidden>
+					<div class="game-heading"><div><h2 id="crazy-chicken-3d-title">Crazy Chicken 3D</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="crazy-chicken-3d.html" title="Crazy Chicken 3D game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-basket-random" aria-labelledby="basket-random-title" hidden>
+					<div class="game-heading"><div><h2 id="basket-random-title">Basket Random</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="basket-random.html" title="Basket Random game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-bendy" aria-labelledby="bendy-title" hidden>
+					<div class="game-heading"><div><h2 id="bendy-title">Bendy and the Ink Machine</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="bendy.html" title="Bendy and the Ink Machine game player" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+				<section class="game-panel" id="panel-bit-planes" aria-labelledby="bit-planes-title" hidden>
+					<div class="game-heading"><div><h2 id="bit-planes-title">Bit Planes</h2></div><div class="game-heading-tools"><button class="fullscreen-toggle" type="button" aria-label="Enter fullscreen game" title="Enter fullscreen game">⛶</button></div></div>
+					<div class="game-content embedded-game-content"><iframe class="embedded-game" data-game-frame data-src="bit-planes.html" title="Bit Planes game player" allow="autoplay; fullscreen; gamepad" allowfullscreen referrerpolicy="no-referrer"></iframe></div>
+				</section>
+			</section>
+		</main>
+	</div>
+	<script>
+		const themeToggle = document.querySelector("#theme-toggle");
+		const colorThemeToggle = document.querySelector("#color-theme-toggle");
+		const colorThemeMenu = document.querySelector("#color-theme-menu");
+		const colorThemeSwatches = [...document.querySelectorAll(".color-theme-swatch")];
+		function setColorTheme(color, persist = true) {
+			if (color === "rainbow") {
+				document.documentElement.dataset.accent = "rainbow";
+				document.documentElement.style.removeProperty("--theme-color");
+			} else {
+				delete document.documentElement.dataset.accent;
+				document.documentElement.style.setProperty("--theme-color", color);
+			}
+			colorThemeSwatches.forEach((swatch) => swatch.setAttribute("aria-pressed", String(swatch.dataset.color === color)));
+			if (persist) {
+				try { localStorage.setItem("sidequest-accent", color); } catch {}
+			}
+		}
+		const initialColor = document.documentElement.dataset.accent === "rainbow" ? "rainbow" : getComputedStyle(document.documentElement).getPropertyValue("--theme-color").trim();
+		setColorTheme(initialColor, false);
+		colorThemeToggle.addEventListener("click", () => {
+			const open = colorThemeMenu.hidden;
+			colorThemeMenu.hidden = !open;
+			colorThemeToggle.setAttribute("aria-expanded", String(open));
+			if (open) colorThemeSwatches.find((swatch) => swatch.getAttribute("aria-pressed") === "true")?.focus();
+		});
+		colorThemeSwatches.forEach((swatch) => swatch.addEventListener("click", () => {
+			setColorTheme(swatch.dataset.color);
+			colorThemeMenu.hidden = true;
+			colorThemeToggle.setAttribute("aria-expanded", "false");
+			colorThemeToggle.focus();
+		}));
+		document.addEventListener("click", (event) => {
+			if (!event.target.closest(".color-theme-picker")) {
+				colorThemeMenu.hidden = true;
+				colorThemeToggle.setAttribute("aria-expanded", "false");
+			}
+		});
+		document.addEventListener("keydown", (event) => {
+			if (event.key === "Escape" && !colorThemeMenu.hidden) {
+				colorThemeMenu.hidden = true;
+				colorThemeToggle.setAttribute("aria-expanded", "false");
+				colorThemeToggle.focus();
+			}
+		});
+		function setDarkMode(enabled, persist = true) {
+			if (enabled) document.documentElement.dataset.theme = "dark";
+			else delete document.documentElement.dataset.theme;
+			themeToggle.setAttribute("aria-pressed", String(enabled));
+			themeToggle.title = enabled ? "Dark mode on" : "Dark mode off";
+			themeToggle.querySelector("span").textContent = enabled ? "☼" : "☾";
+			document.querySelector('meta[name="theme-color"]').content = enabled ? "#171816" : "#ffffff";
+			if (persist) {
+				try { localStorage.setItem("sidequest-theme", enabled ? "dark" : "light"); } catch {}
+			}
+		}
+		setDarkMode(document.documentElement.dataset.theme === "dark", false);
+		themeToggle.addEventListener("click", () => setDarkMode(document.documentElement.dataset.theme !== "dark"));
+
+		const tabs = [...document.querySelectorAll(".game-tab")];
+		const panels = [...document.querySelectorAll(".game-panel")];
+		function isGameFrameLoading(frame) {
+			try {
+				const gameDocument = frame.contentDocument;
+				if (!gameDocument || gameDocument.readyState !== "complete") return true;
+				const errors = gameDocument.querySelectorAll("#load-error, #unity-warning, [role='alert']");
+				if ([...errors].some((error) => error.textContent.trim())) return false;
+				const indicators = gameDocument.querySelectorAll("#loading-text, #loading-textt, #unity-loading-label, #unity-loading-bar");
+				return [...indicators].some((indicator) => {
+					for (let element = indicator; element; element = element.parentElement) {
+						if (element.hidden) return false;
+						const style = gameDocument.defaultView.getComputedStyle(element);
+						if (style.display === "none" || style.visibility === "hidden") return false;
+					}
+					return true;
+				});
+			} catch {
+				return false;
+			}
+		}
+		tabs.forEach((tab) => tab.addEventListener("click", () => {
+			const panelId = `panel-${tab.dataset.game}`;
+			tabs.forEach((item) => item.setAttribute("aria-pressed", String(item === tab)));
+			panels.forEach((panel) => {
+				const frame = panel.querySelector("[data-game-frame]");
+				if (panel.id !== panelId && frame && !isGameFrameLoading(frame)) frame.removeAttribute("src");
+				panel.hidden = panel.id !== panelId;
+			});
+			const frame = document.querySelector(`#${panelId} [data-game-frame]`);
+			if (frame && !frame.hasAttribute("src")) frame.src = frame.dataset.src;
+			if (tab.dataset.game === "minus-b") loadMinusB();
+		}));
+
+		const minusBBase = "https://cdn.jsdelivr.net/gh/web-ports/baldi-mods@a9a006b703c35330ec3925de5a1edcc99df123c8/-b/";
+		const minusBLoading = document.querySelector("#minus-b-loading");
+		let minusBStarted = false;
+		let minusBLoadedBytes = 0;
+		async function fetchMinusBPart(url) {
+			const response = await fetch(url);
+			if (!response.ok) throw new Error(`Could not load game data (${response.status})`);
+			if (!response.body) return response.arrayBuffer();
+			const reader = response.body.getReader();
+			const chunks = [];
+			let received = 0;
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				received += value.length;
+				minusBLoadedBytes += value.length;
+				chunks.push(value);
+				minusBLoading.textContent = `LOADING... ${(minusBLoadedBytes / (1024 * 1024)).toFixed(2)} MB / 49.47 MB`;
+			}
+			const buffer = new Uint8Array(received);
+			let offset = 0;
+			for (const chunk of chunks) {
+				buffer.set(chunk, offset);
+				offset += chunk.length;
+			}
+			return buffer.buffer;
+		}
+		async function mergeMinusBFiles(file, cacheKey) {
+			let cache;
+			if ("caches" in window) {
+				try {
+					cache = await caches.open("minus-b-cache");
+					const cachedResponse = await cache.match(cacheKey);
+					if (cachedResponse) return URL.createObjectURL(await cachedResponse.blob());
+				} catch {
+					cache = undefined;
+				}
+			}
+			const buffers = await Promise.all([1, 2].map((part) => fetchMinusBPart(`${minusBBase}${file}.part${part}`)));
+			const blob = new Blob(buffers);
+			if (cache) {
+				try { await cache.put(cacheKey, new Response(blob)); } catch {}
+			}
+			return URL.createObjectURL(blob);
+		}
+		function loadMinusB() {
+			if (minusBStarted) return;
+			minusBStarted = true;
+			minusBLoading.textContent = "LOADING...";
+			const loader = document.createElement("script");
+			loader.src = `${minusBBase}Build/UnityLoader.js`;
+			loader.onload = async () => {
+				try {
+					const [dataUrl, wasmUrl] = await Promise.all([
+						mergeMinusBFiles("Build/minusbbog.data.unityweb", "minusbbog.data.unityweb"),
+						mergeMinusBFiles("Build/minusbbog.wasm.code.unityweb", "minusbbog.wasm.code.unityweb"),
+					]);
+					const originalOpen = XMLHttpRequest.prototype.open;
+					XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+						if (typeof url === "string" && url.includes("minusbbog.data.unityweb")) url = dataUrl;
+						else if (typeof url === "string" && url.includes("minusbbog.wasm.code.unityweb")) url = wasmUrl;
+						return originalOpen.call(this, method, url, ...rest);
+					};
+					window.UnityLoader.instantiate("minus-b-container", `${minusBBase}Build/minusbbog.json`);
+					minusBLoading.remove();
+				} catch (error) {
+					minusBLoading.dataset.error = "true";
+					minusBLoading.textContent = `Unable to load Minus B: ${error.message}`;
+					console.error(error);
+				}
+			};
+			loader.onerror = () => {
+				minusBLoading.dataset.error = "true";
+				minusBLoading.textContent = "Unable to load Minus B. Check your internet connection and try again.";
+			};
+			document.head.append(loader);
+		}
+		document.querySelectorAll(".game-panel").forEach((panel) => {
+			const button = panel.querySelector(".fullscreen-toggle");
+			button.addEventListener("click", async () => {
+				if (document.fullscreenElement === panel) await document.exitFullscreen();
+				else await panel.requestFullscreen();
+			});
+			document.addEventListener("fullscreenchange", () => {
+				const active = document.fullscreenElement === panel;
+				button.setAttribute("aria-label", `${active ? "Exit" : "Enter"} fullscreen game`);
+				button.title = `${active ? "Exit" : "Enter"} fullscreen game`;
+			});
+		});
+
+		const ticBoard = document.querySelector("#tic-board");
+		const ticStatus = document.querySelector("#tic-status");
+		const winLines = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+		let ticCells = Array(9).fill("");
+		let ticTurn = "X";
+		let ticFinished = false;
+		function renderTicBoard() {
+			ticBoard.replaceChildren(...ticCells.map((mark, index) => {
+				const cell = document.createElement("button");
+				cell.type = "button";
+				cell.className = "tic-cell";
+				cell.setAttribute("role", "gridcell");
+				cell.setAttribute("aria-label", mark ? `Cell ${index + 1}: ${mark}` : `Cell ${index + 1}, empty`);
+				cell.dataset.mark = mark;
+				cell.textContent = mark;
+				cell.disabled = Boolean(mark) || ticFinished;
+				cell.addEventListener("click", () => playTic(index));
+				return cell;
+			}));
+		}
+		function playTic(index) {
+			if (ticCells[index] || ticFinished) return;
+			ticCells[index] = ticTurn;
+			if (winLines.some((line) => line.every((cell) => ticCells[cell] === ticTurn))) {
+				ticFinished = true;
+				ticStatus.textContent = `${ticTurn} wins the round!`;
+			} else if (ticCells.every(Boolean)) {
+				ticFinished = true;
+				ticStatus.textContent = "It's a draw. Nice game.";
+			} else {
+				ticTurn = ticTurn === "X" ? "O" : "X";
+				ticStatus.textContent = `${ticTurn}'s turn`;
+			}
+			renderTicBoard();
+		}
+		function resetTic() {
+			ticCells = Array(9).fill("");
+			ticTurn = "X";
+			ticFinished = false;
+			ticStatus.textContent = "X goes first";
+			renderTicBoard();
+		}
+		document.querySelector("#tic-reset").addEventListener("click", resetTic);
+		renderTicBoard();
+
+		const memoryFaces = ["●", "▲", "◆", "■", "✦", "⬟"];
+		const memoryBoard = document.querySelector("#memory-board");
+		const memoryStatus = document.querySelector("#memory-status");
+		const memoryMoves = document.querySelector("#memory-moves");
+		let memoryCards = [];
+		let memoryOpen = [];
+		let memoryMatched = new Set();
+		let memoryMoveCount = 0;
+		let memoryLocked = false;
+		let memoryTimeout;
+		function shuffle(values) {
+			for (let index = values.length - 1; index > 0; index--) {
+				const swapIndex = Math.floor(Math.random() * (index + 1));
+				[values[index], values[swapIndex]] = [values[swapIndex], values[index]];
+			}
+			return values;
+		}
+		function renderMemory() {
+			memoryBoard.replaceChildren(...memoryCards.map((face, index) => {
+				const isOpen = memoryOpen.includes(index) || memoryMatched.has(index);
+				const card = document.createElement("button");
+				card.type = "button";
+				card.className = "memory-card";
+				card.dataset.open = String(isOpen);
+				card.textContent = isOpen ? face : "+";
+				card.setAttribute("aria-label", isOpen ? `Card ${index + 1}: ${face}` : `Card ${index + 1}, hidden`);
+				card.setAttribute("aria-pressed", String(isOpen));
+				card.disabled = memoryMatched.has(index) || memoryLocked;
+				card.addEventListener("click", () => flipMemory(index));
+				return card;
+			}));
+		}
+		function flipMemory(index) {
+			if (memoryLocked || memoryMatched.has(index) || memoryOpen.includes(index)) return;
+			memoryOpen.push(index);
+			if (memoryOpen.length === 2) {
+				memoryMoveCount++;
+				memoryMoves.textContent = `${memoryMoveCount} ${memoryMoveCount === 1 ? "move" : "moves"}`;
+				const [first, second] = memoryOpen;
+				if (memoryCards[first] === memoryCards[second]) {
+					memoryMatched.add(first);
+					memoryMatched.add(second);
+					memoryOpen = [];
+					if (memoryMatched.size === memoryCards.length) memoryStatus.textContent = `All pairs in ${memoryMoveCount} moves.`;
+				} else {
+					memoryLocked = true;
+					memoryTimeout = setTimeout(() => { memoryOpen = []; memoryLocked = false; renderMemory(); }, 750);
+				}
+			}
+			renderMemory();
+		}
+		function resetMemory() {
+			clearTimeout(memoryTimeout);
+			memoryCards = shuffle([...memoryFaces, ...memoryFaces]);
+			memoryOpen = [];
+			memoryMatched = new Set();
+			memoryMoveCount = 0;
+			memoryLocked = false;
+			memoryMoves.textContent = "0 moves";
+			memoryStatus.textContent = "Find all six pairs";
+			renderMemory();
+		}
+		document.querySelector("#memory-reset").addEventListener("click", resetMemory);
+		resetMemory();
+
+		const reactionPad = document.querySelector("#reaction-pad");
+		const reactionPrompt = document.querySelector("#reaction-prompt");
+		const reactionHint = document.querySelector("#reaction-hint");
+		const reactionStatus = document.querySelector("#reaction-status");
+		const bestTime = document.querySelector("#best-time");
+		let reactionState = "idle";
+		let readyAt = 0;
+		let reactionTimeout;
+		let bestMilliseconds = null;
+		function setReactionState(state, title, hint, status) {
+			reactionState = state;
+			reactionPad.dataset.state = state;
+			reactionPrompt.textContent = title;
+			reactionHint.textContent = hint;
+			reactionStatus.textContent = status;
+		}
+		reactionPad.addEventListener("click", () => {
+			if (["idle", "result", "early"].includes(reactionState)) {
+				setReactionState("waiting", "Wait for the signal…", "Don't tap until the color changes", "Get ready…");
+				reactionTimeout = setTimeout(() => {
+					readyAt = performance.now();
+					setReactionState("ready", "TAP!", "Go on, go on!", "Now!");
+				}, 1600 + Math.random() * 2500);
+			} else if (reactionState === "waiting") {
+				clearTimeout(reactionTimeout);
+				setReactionState("early", "Too soon!", "Tap to give it another go", "False start. Try again.");
+			} else if (reactionState === "ready") {
+				const elapsed = Math.round(performance.now() - readyAt);
+				setReactionState("result", `${elapsed} ms`, "Tap to play another round", "Quick hands!");
+				if (bestMilliseconds === null || elapsed < bestMilliseconds) {
+					bestMilliseconds = elapsed;
+					bestTime.textContent = `BEST  ${elapsed} ms`;
+				}
+			}
+		});
+
+		const cpsPad = document.querySelector("#cps-pad");
+		const cpsCount = document.querySelector("#cps-count");
+		const cpsTimer = document.querySelector("#cps-timer");
+		const cpsStatus = document.querySelector("#cps-status");
+		const cpsBest = document.querySelector("#cps-best");
+		const cpsDuration = 5000;
+		let cpsState = "idle";
+		let cpsClicks = 0;
+		let cpsStartedAt = 0;
+		let cpsInterval;
+		let cpsBestValue = null;
+
+		function resetCps() {
+			clearInterval(cpsInterval);
+			cpsState = "idle";
+			cpsClicks = 0;
+			cpsPad.disabled = false;
+			cpsCount.textContent = "Click to start";
+			cpsTimer.textContent = "Click as fast as you can for 5 seconds";
+			cpsStatus.textContent = "Ready when you are";
+		}
+
+		function finishCps() {
+			clearInterval(cpsInterval);
+			cpsState = "result";
+			const score = Math.round(cpsClicks / (cpsDuration / 1000) * 10) / 10;
+			cpsCount.textContent = `${score} CPS`;
+			cpsTimer.textContent = `${cpsClicks} clicks in 5 seconds`;
+			cpsStatus.textContent = "Time's up! Click to try again.";
+			if (cpsBestValue === null || score > cpsBestValue) {
+				cpsBestValue = score;
+				cpsBest.textContent = `BEST  ${score} CPS`;
+			}
+		}
+
+		cpsPad.addEventListener("click", () => {
+			if (cpsState !== "running") {
+				cpsState = "running";
+				cpsClicks = 1;
+				cpsStartedAt = performance.now();
+				cpsCount.textContent = String(cpsClicks);
+				cpsStatus.textContent = "Keep clicking!";
+				cpsInterval = setInterval(() => {
+					const remaining = Math.max(0, cpsDuration - (performance.now() - cpsStartedAt));
+					cpsTimer.textContent = `${(remaining / 1000).toFixed(1)} seconds left`;
+					if (remaining === 0) finishCps();
+				}, 50);
+				return;
+			}
+			if (performance.now() - cpsStartedAt >= cpsDuration) {
+				finishCps();
+				return;
+			}
+			cpsClicks++;
+			cpsCount.textContent = String(cpsClicks);
+		});
+		document.querySelector("#cps-reset").addEventListener("click", resetCps);
+	</script>
+</body>
+</html>

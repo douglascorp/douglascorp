@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Pokemon Emerald</title>
+	<style>
+		html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #101820; color: #fff; font: 15px sans-serif; }
+		#game { width: 100%; height: 100%; }
+		#rom-picker { position: absolute; inset: 0; z-index: 2; display: grid; align-content: center; justify-items: center; gap: 16px; padding: 24px; background: #101820; text-align: center; }
+		#rom-picker[hidden], #loading[hidden] { display: none; }
+		#rom-file { max-width: 100%; }
+		#loading { position: absolute; top: 12px; left: 12px; z-index: 3; padding: 8px 12px; background: #101820e8; }
+		#load-error { max-width: 680px; color: #ffb4ab; overflow-wrap: anywhere; }
+	</style>
+</head>
+<body>
+	<div id="rom-picker">
+		<strong>Pokemon Emerald</strong>
+		<label for="rom-file">Choose a GBA ROM from your device</label>
+		<input id="rom-file" type="file" accept=".gba,.bin,application/octet-stream">
+		<div id="load-error" role="alert"></div>
+	</div>
+	<div id="loading" role="status" aria-live="polite" hidden>Loading emulator...</div>
+	<div id="game"></div>
+	<script>
+		const emulatorData = "https://cdn.jsdelivr.net/gh/ant9012/emu-updated@master/";
+		const romPicker = document.querySelector("#rom-picker");
+		const romInput = document.querySelector("#rom-file");
+		const loading = document.querySelector("#loading");
+		const loadError = document.querySelector("#load-error");
+		let emulatorStarted = false;
+		let gameUrl;
+
+		romInput.addEventListener("change", () => {
+			const rom = romInput.files[0];
+			if (!rom || emulatorStarted) return;
+			emulatorStarted = true;
+			loading.hidden = false;
+			gameUrl = URL.createObjectURL(rom);
+			window.EJS_player = "#game";
+			window.EJS_core = "gba";
+			window.EJS_gameName = "Pokemon Emerald";
+			window.EJS_color = "#0064ff";
+			window.EJS_startOnLoaded = true;
+			window.EJS_pathtodata = emulatorData;
+			window.EJS_gameUrl = gameUrl;
+			window.EJS_ready = () => { loading.textContent = "Starting Pokemon Emerald..."; };
+			window.EJS_onGameStart = () => { loading.hidden = true; romPicker.hidden = true; };
+			const loader = document.createElement("script");
+			loader.src = `${emulatorData}loader.js`;
+			loader.onerror = () => {
+				loadError.textContent = "Could not load the GBA emulator. Check your connection and try again.";
+				loading.hidden = true;
+				emulatorStarted = false;
+				URL.revokeObjectURL(gameUrl);
+			};
+			document.body.append(loader);
+		});
+	</script>
+</body>
+</html>

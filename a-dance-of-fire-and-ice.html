@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<base href="https://cdn.jsdelivr.net/gh/udbsite/adofai@f170efcb1b532312817e69f26ce3f84c99940238/">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>A Dance of Fire and Ice</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/paigerodeghero/academicwebsite@897c910c65e6c68b04c44a6b6eba0b99d0f2f2cf/TemplateData/style.css">
+	<script src="https://cdn.jsdelivr.net/gh/paigerodeghero/academicwebsite@897c910c65e6c68b04c44a6b6eba0b99d0f2f2cf/TemplateData/UnityProgress.js"></script>
+	<script src="https://cdn.jsdelivr.net/gh/udbsite/adofai@f170efcb1b532312817e69f26ce3f84c99940238/Build/UnityLoader.js"></script>
+	<style>
+		html, body, .webgl-content, #gameContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+		.webgl-content, #gameContainer { width: 100vw; height: 100vh; }
+		canvas { width: 100% !important; height: 100% !important; }
+		#loading-text { position: fixed; top: 16px; left: 0; z-index: 5; width: 100%; margin: 0; color: #fff; font: 18px sans-serif; text-align: center; pointer-events: none; }
+		#load-error { position: fixed; inset: auto 12px 12px; z-index: 6; color: #fff; font: 14px sans-serif; text-align: center; }
+	</style>
+</head>
+<body>
+	<p id="loading-text" role="status" aria-live="polite">Loading A Dance of Fire and Ice...</p>
+	<div class="webgl-content"><div id="gameContainer"></div></div>
+	<div id="load-error" role="alert"></div>
+	<script>
+		const loadingText = document.querySelector("#loading-text");
+		const loadError = document.querySelector("#load-error");
+		const loader = document.querySelector('script[src*="UnityLoader.js"]');
+		loader.addEventListener("error", () => {
+			loadingText.textContent = "A Dance of Fire and Ice could not be loaded";
+			loadError.textContent = "Could not load the Unity game loader. Check your internet connection.";
+		});
+		if (window.UnityLoader && window.UnityProgress) {
+			window.UnityLoader.instantiate("gameContainer", "https://cdn.jsdelivr.net/gh/udbsite/adofai@f170efcb1b532312817e69f26ce3f84c99940238/Build/adofaiii4.json", {
+				onProgress: (instance, progress) => {
+					window.UnityProgress(instance, progress);
+					if (progress >= 1) loadingText.remove();
+				},
+			});
+		} else if (window.UnityLoader) {
+			window.UnityLoader.instantiate("gameContainer", "https://cdn.jsdelivr.net/gh/udbsite/adofai@f170efcb1b532312817e69f26ce3f84c99940238/Build/adofaiii4.json");
+		} else {
+			loadingText.textContent = "A Dance of Fire and Ice could not be loaded";
+			loadError.textContent = "Could not load the Unity game loader. Check your internet connection.";
+		}
+	</script>
+</body>
+</html>

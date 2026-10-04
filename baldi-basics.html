@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/baldis-basics/">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Baldi's Basics</title>
+	<link rel="stylesheet" href="TemplateData/style.css">
+	<script>
+		window.fileMergerConfig = {
+			files: [
+				{ name: "baldi.data.unityweb", parts: 2 },
+				{ name: "baldi.wasm.code.unityweb", parts: 1 },
+				{ name: "baldi.wasm.framework.unityweb", parts: 1 },
+			],
+			basePath: "unity/",
+		};
+	</script>
+	<script>
+		const originalFetch = window.fetch.bind(window);
+		window.fetch = async (...args) => {
+			let lastError;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				try {
+					const response = await originalFetch(...args);
+					if (response.ok || (response.status !== 429 && response.status < 500) || attempt === 2) return response;
+					lastError = new Error(`Temporary asset server error (${response.status})`);
+				} catch (error) {
+					lastError = error;
+					if (attempt === 2) throw error;
+				}
+				await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+			}
+			throw lastError;
+		};
+	</script>
+	<script src="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/merge.js"></script>
+	<script src="TemplateData/UnityProgress.js"></script>
+	<script src="baldi.js"></script>
+	<style>
+		html, body, .webgl-content, #unityContainer, #gameContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #231f20; }
+		.webgl-content, #unityContainer, #gameContainer { width: 100vw !important; height: 100vh !important; }
+		canvas { width: 100% !important; height: 100% !important; }
+		#loading-text { position: fixed; top: 16px; left: 0; z-index: 5; width: 100%; margin: 0; color: #fff; font: 18px sans-serif; text-align: center; pointer-events: none; }
+		#load-error { position: fixed; inset: auto 12px 12px; z-index: 6; color: #fff; font: 14px sans-serif; text-align: center; }
+	</style>
+</head>
+<body style="margin: 0">
+	<p id="loading-text" role="status" aria-live="polite">Loading Baldi's Basics...</p>
+	<div class="webgl-content"><div id="unityContainer"><div id="gameContainer"></div></div></div>
+	<div id="load-error" role="alert"></div>
+	<script>
+		const loadingText = document.querySelector("#loading-text");
+		const loadError = document.querySelector("#load-error");
+		try {
+			if (!window.UnityLoader || !window.UnityProgress) throw new Error("Could not load the Unity game loader");
+			window.UnityLoader.instantiate("gameContainer", "baldi.json", {
+				onProgress: (instance, progress) => {
+					window.UnityProgress(instance, progress);
+					if (progress >= 1) loadingText.remove();
+				},
+			});
+		} catch (error) {
+			loadingText.textContent = "Baldi's Basics could not be loaded";
+			loadError.textContent = error.message;
+			console.error(error);
+		}
+	</script>
+</body>
+</html>

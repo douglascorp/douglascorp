@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>NES Player</title>
+	<style>
+		html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #080808; color: #fff; font-family: sans-serif; }
+		#rom-picker { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; }
+		#rom-file { max-width: calc(100% - 32px); padding: 12px; border: 1px solid #777; background: #191919; color: #fff; }
+		#game { width: 100%; height: 100%; }
+		#load-error { position: absolute; right: 12px; bottom: 12px; left: 12px; color: #ff8d8d; text-align: center; }
+	</style>
+</head>
+<body>
+	<div id="rom-picker"><input id="rom-file" type="file" accept=".nes,.zip" aria-label="Choose a local NES ROM"></div>
+	<div id="game"></div>
+	<div id="load-error" role="alert"></div>
+	<script>
+		const emulatorData = "https://cdn.jsdelivr.net/gh/a456pur/seraph@81f551ca0aa8e3d6018d32d8ac5904ac9bc78f76/storage/emulatorjs/data/";
+		const romPicker = document.querySelector("#rom-picker");
+		const romInput = document.querySelector("#rom-file");
+		const loadError = document.querySelector("#load-error");
+		let emulatorStarted = false;
+		let gameUrl;
+
+		romInput.addEventListener("change", () => {
+			const rom = romInput.files[0];
+			if (!rom || emulatorStarted) return;
+			emulatorStarted = true;
+			gameUrl = URL.createObjectURL(rom);
+			window.EJS_player = "#game";
+			window.EJS_core = "nes";
+			window.EJS_color = "#000000";
+			window.EJS_startOnLoaded = true;
+			window.EJS_pathtodata = emulatorData;
+			window.EJS_gameUrl = gameUrl;
+			const loader = document.createElement("script");
+			loader.src = `${emulatorData}loader.js`;
+			loader.onerror = () => {
+				loadError.textContent = "Could not load the NES emulator. Check your internet connection.";
+				emulatorStarted = false;
+				URL.revokeObjectURL(gameUrl);
+			};
+			loader.onload = () => { romPicker.hidden = true; };
+			document.body.append(loader);
+		});
+	</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<base href="https://cdn.jsdelivr.net/gh/web-ports/raldi@main/">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>BALDI</title>
+	<link rel="shortcut icon" href="TemplateData/favicon.ico">
+	<link rel="stylesheet" href="TemplateData/style.css">
+	<style>
+		html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; color: #fff; font-family: sans-serif; }
+		#unity-container { position: fixed; inset: 0; width: 100%; height: 100%; }
+		#unity-canvas { display: block; width: 100% !important; height: 100% !important; }
+		#loading-panel { position: fixed; inset: 0; z-index: 2; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 24px; background: #000; text-align: center; }
+		#loading-text { margin: 0; font-size: 18px; }
+		#loading-progress { width: min(80vw, 440px); height: 12px; }
+		#load-error { max-width: 720px; color: #ff9c9c; overflow-wrap: anywhere; }
+		#unity-loading-bar, #unity-warning { display: none !important; }
+	</style>
+</head>
+<body>
+	<div id="unity-container" class="unity-desktop">
+		<canvas id="unity-canvas" width="960" height="600" tabindex="-1" aria-label="BALDI game"></canvas>
+	</div>
+	<div id="loading-panel" role="status" aria-live="polite">
+		<p id="loading-text">Loading BALDI assets...</p>
+		<progress id="loading-progress" max="244429525" value="0"></progress>
+		<div id="load-error" role="alert"></div>
+	</div>
+	<script>
+		const baseUrl = document.baseURI;
+		const loadingPanel = document.querySelector("#loading-panel");
+		const loadingText = document.querySelector("#loading-text");
+		const loadingProgress = document.querySelector("#loading-progress");
+		const loadError = document.querySelector("#load-error");
+		const assetAbortController = new AbortController();
+		const totalBytes = 244429525;
+		let loadedBytes = 0;
+
+		function updateProgress() {
+			loadingProgress.value = Math.min(loadedBytes, totalBytes);
+			loadingText.textContent = `Loading BALDI assets: ${(loadedBytes / 1048576).toFixed(1)} / ${(totalBytes / 1048576).toFixed(1)} MB`;
+		}
+
+		async function fetchPart(path) {
+			let lastError;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				const requestController = new AbortController();
+				const abortWithGame = () => requestController.abort();
+				assetAbortController.signal.addEventListener("abort", abortWithGame, { once: true });
+				const timeout = setTimeout(() => requestController.abort(), 20000);
+				try {
+					const response = await fetch(new URL(path, baseUrl), { signal: requestController.signal });
+					if (!response.ok) {
+						const error = new Error(`Asset request failed (${response.status}): ${path}`);
+						if (response.status !== 429 && response.status < 500) throw error;
+						lastError = error;
+					} else {
+						const buffer = await response.arrayBuffer();
+						loadedBytes += buffer.byteLength;
+						updateProgress();
+						return buffer;
+					}
+				} catch (error) {
+					lastError = error;
+					if (assetAbortController.signal.aborted || error.message.includes("Asset request failed (4") || attempt === 2) throw error;
+				} finally {
+					clearTimeout(timeout);
+					assetAbortController.signal.removeEventListener("abort", abortWithGame);
+				}
+				await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+			}
+			throw lastError;
+		}
+
+		async function mergeParts(name, count) {
+			const parts = await Promise.all(Array.from({ length: count }, (_, index) => fetchPart(`Build/${name}.part${index + 1}`)));
+			return URL.createObjectURL(new Blob(parts));
+		}
+
+		async function startGame() {
+			try {
+				const [dataUrl, wasmUrl] = await Promise.all([
+					mergeParts("BALDI.data", 10),
+					mergeParts("BALDI.wasm", 2),
+				]);
+				loadingText.textContent = "Starting BALDI...";
+				const loader = document.createElement("script");
+				loader.src = new URL("Build/BALDI.loader.js", baseUrl).href;
+				loader.onerror = () => {
+					loadingText.textContent = "BALDI could not be loaded";
+					loadError.textContent = "Could not load the Unity game loader. Check your internet connection.";
+				};
+				loader.onload = () => {
+					try {
+						if (typeof window.createUnityInstance !== "function") throw new Error("The Unity game loader did not initialize.");
+						const config = {
+							dataUrl,
+							frameworkUrl: new URL("Build/BALDI.framework.js", baseUrl).href,
+							codeUrl: wasmUrl,
+							streamingAssetsUrl: new URL("StreamingAssets", baseUrl).href,
+							companyName: "Unknown",
+							productName: "BALDI",
+							productVersion: "1.0",
+						};
+						window.createUnityInstance(document.querySelector("#unity-canvas"), config, (progress) => {
+							loadingProgress.value = progress * totalBytes;
+							loadingText.textContent = `Starting BALDI: ${Math.round(progress * 100)}%`;
+						}).then(() => loadingPanel.remove()).catch((error) => {
+							loadingText.textContent = "BALDI could not start";
+							loadError.textContent = String(error);
+							console.error(error);
+						});
+					} catch (error) {
+						loadingText.textContent = "BALDI could not start";
+						loadError.textContent = String(error);
+						console.error(error);
+					}
+				};
+				document.body.append(loader);
+			} catch (error) {
+				assetAbortController.abort();
+				loadingText.textContent = "BALDI could not be loaded";
+				loadError.textContent = error.message;
+				console.error(error);
+			}
+		}
+
+		startGame();
+	</script>
+</body>
+</html>

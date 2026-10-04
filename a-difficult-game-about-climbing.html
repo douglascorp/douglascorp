@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<base href="https://cdn.jsdelivr.net/gh/web-ports/adgac@main/">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>A Difficult Game About Climbing</title>
+	<link rel="shortcut icon" href="TemplateData/favicon.ico">
+	<link rel="stylesheet" href="TemplateData/style.css">
+	<style>
+		html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #231f20; }
+		#unity-container { position: fixed !important; inset: 0; width: 100% !important; height: 100% !important; }
+		#unity-canvas { display: block; width: 100% !important; height: 100% !important; }
+		#loading-text { position: fixed; top: 16px; left: 0; z-index: 5; width: 100%; margin: 0; color: #fff; font: 16px sans-serif; text-align: center; pointer-events: none; }
+		#load-error { position: fixed; inset: auto 12px 12px; z-index: 6; color: #fff; font: 14px sans-serif; text-align: center; }
+	</style>
+</head>
+<body>
+	<p id="loading-text" role="status" aria-live="polite">Loading assets for A Difficult Game About Climbing (about 320 MB)...</p>
+	<div id="unity-container" class="unity-desktop">
+		<canvas id="unity-canvas" tabindex="-1" aria-label="A Difficult Game About Climbing"></canvas>
+		<div id="unity-loading-bar"><div id="unity-logo"></div><div id="unity-progress-bar-empty"><div id="unity-progress-bar-full"></div></div></div>
+	</div>
+	<div id="load-error" role="alert"></div>
+	<script>
+		const gameBase = "https://cdn.jsdelivr.net/gh/web-ports/adgac@main/";
+		const buildUrl = `${gameBase}Build`;
+		const loadingText = document.querySelector("#loading-text");
+		const loadError = document.querySelector("#load-error");
+		const loadingBar = document.querySelector("#unity-loading-bar");
+		const progressBar = document.querySelector("#unity-progress-bar-full");
+		let loadedBytes = 0;
+
+		async function fetchPart(url) {
+			const response = await fetch(url);
+			if (!response.ok) throw new Error(`Could not load a game asset (${response.status})`);
+			if (!response.body) return response.arrayBuffer();
+			const reader = response.body.getReader();
+			const chunks = [];
+			let length = 0;
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				chunks.push(value);
+				length += value.length;
+				loadedBytes += value.length;
+				loadingText.textContent = `Downloading assets... ${(loadedBytes / 1048576).toFixed(1)} / 319.89 MB`;
+			}
+			const buffer = new Uint8Array(length);
+			let offset = 0;
+			for (const chunk of chunks) { buffer.set(chunk, offset); offset += chunk.length; }
+			return buffer.buffer;
+		}
+
+		async function mergeParts(file, count) {
+			const parts = await Promise.all(Array.from({ length: count }, (_, index) => fetchPart(`${buildUrl}/${file}.part${index + 1}`)));
+			return URL.createObjectURL(new Blob(parts));
+		}
+
+		async function startGame() {
+			try {
+				const [dataUrl, wasmUrl] = await Promise.all([
+					mergeParts("adgac.data", 14),
+					mergeParts("adgac.wasm", 3),
+				]);
+				const loader = document.createElement("script");
+				loader.src = `${buildUrl}/adgac.loader.js`;
+				loader.onerror = () => {
+					loadingText.textContent = "A Difficult Game About Climbing could not be loaded";
+					loadError.textContent = "Could not load the Unity game loader. Check your internet connection.";
+				};
+				loader.onload = () => {
+					loadingBar.style.display = "block";
+					const config = {
+						dataUrl,
+						frameworkUrl: `${buildUrl}/adgac.framework.js`,
+						codeUrl: wasmUrl,
+						streamingAssetsUrl: `${gameBase}StreamingAssets`,
+						companyName: "Pontypants",
+						productName: "A Difficult Game About Climbing",
+						productVersion: "1.2.61",
+				};
+					if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) config.devicePixelRatio = 1;
+					window.createUnityInstance(document.querySelector("#unity-canvas"), config, (progress) => {
+						progressBar.style.width = `${100 * progress}%`;
+					}).then(() => {
+						loadingBar.style.display = "none";
+						loadingText.remove();
+					}).catch((error) => {
+						loadingText.textContent = "A Difficult Game About Climbing could not be loaded";
+						loadError.textContent = String(error);
+						console.error(error);
+					});
+				};
+				document.body.append(loader);
+			} catch (error) {
+				loadingText.textContent = "A Difficult Game About Climbing could not be loaded";
+				loadError.textContent = error.message;
+				console.error(error);
+			}
+		}
+
+		startGame();
+	</script>
+</body>
+</html>

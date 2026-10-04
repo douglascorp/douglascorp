@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<base href="https://cdn.jsdelivr.net/gh/larpinguser/q8j@main/">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>SCP: Containment Breach</title>
+	<style>
+		html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+		#wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+		#canvas { display: block; background: #000; outline: none; }
+		#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #000; color: #fff; z-index: 5; font: 500 15px/1.4 sans-serif; }
+		#pct { margin: 0; font-variant-numeric: tabular-nums; }
+		#bar { width: min(340px, 60vw); height: 3px; background: rgba(255,255,255,.15); overflow: hidden; }
+		#barfill { width: 0; height: 100%; background: #fff; transition: width .2s ease-out; }
+		#load-error { max-width: min(600px, 85vw); padding: 0 20px; color: #ffb4ab; text-align: center; overflow-wrap: anywhere; }
+	</style>
+</head>
+<body>
+	<div id="wrap"><canvas id="canvas" tabindex="-1" aria-label="SCP: Containment Breach game"></canvas></div>
+	<div id="loading" role="status" aria-live="polite"><p id="pct">0%</p><div id="bar"><div id="barfill"></div></div></div>
+	<script>
+		const canvas = document.querySelector("#canvas");
+		const loading = document.querySelector("#loading");
+		const bar = document.querySelector("#bar");
+		const barfill = document.querySelector("#barfill");
+		const pctEl = document.querySelector("#pct");
+		let maxPct = 0;
+
+		function fitCanvas() {
+			const width = canvas.width || 1280;
+			const height = canvas.height || 720;
+			const scale = Math.min(innerWidth / width, innerHeight / height);
+			canvas.style.width = `${Math.round(width * scale)}px`;
+			canvas.style.height = `${Math.round(height * scale)}px`;
+		}
+
+		function showFailure(message) {
+			bar.hidden = true;
+			pctEl.hidden = true;
+			let error = document.querySelector("#load-error");
+			if (!error) {
+				error = document.createElement("div");
+				error.id = "load-error";
+				error.setAttribute("role", "alert");
+				loading.append(error);
+			}
+			error.textContent = message;
+		}
+
+		new MutationObserver(fitCanvas).observe(canvas, { attributes: true, attributeFilter: ["width", "height"] });
+		fitCanvas();
+		addEventListener("resize", fitCanvas);
+		addEventListener("fullscreenchange", fitCanvas);
+		addEventListener("keydown", (event) => {
+			if (event.code === "KeyF" && !event.repeat && document.pointerLockElement !== canvas && !document.fullscreenElement) {
+				document.documentElement.requestFullscreen?.().catch(() => {});
+			}
+		}, true);
+		canvas.addEventListener("mousedown", () => canvas.focus());
+
+		const requestPointerLock = canvas.requestPointerLock?.bind(canvas);
+		canvas.requestPointerLock = function () {
+			try { requestPointerLock?.()?.catch?.(() => {}); } catch {}
+		};
+		const exitPointerLock = document.exitPointerLock?.bind(document);
+		document.exitPointerLock = function () {
+			try { exitPointerLock?.(); } catch {}
+		};
+
+		var Module = {
+			canvas,
+			print: (text) => { if (text) console.log(text); },
+			printErr: (text) => { if (text) console.error(text); },
+			setStatus: (text) => {
+				if (!text) { loading.style.display = "none"; return; }
+				const match = /\((\d+(\.\d+)?)\/(\d+)\)/.exec(text);
+				if (match) {
+					const percent = Math.min(100, Math.round((parseFloat(match[1]) / parseFloat(match[3])) * 100));
+					if (percent >= maxPct) {
+						maxPct = percent;
+						barfill.style.width = `${percent}%`;
+						pctEl.textContent = `${percent}%`;
+					}
+				}
+			},
+			postRun: [() => setTimeout(() => { loading.style.display = "none"; }, 350)],
+			preRun: [() => {
+				const lookupPath = FS.lookupPath.bind(FS);
+				const pathCache = new Map();
+				const findCaseSensitivePath = (path) => {
+					if (pathCache.has(path)) return pathCache.get(path);
+					let base = "/";
+					const output = [];
+					for (const component of path.split("/").filter((value) => value && value !== ".")) {
+						const candidate = (base === "/" ? "/" : `${base}/`) + component;
+						try {
+							lookupPath(candidate, {});
+							output.push(component);
+							base = candidate;
+							continue;
+						} catch {}
+						let names;
+						try { names = FS.readdir(base); } catch { pathCache.set(path, null); return null; }
+						const match = names.find((name) => name.toLowerCase() === component.toLowerCase());
+						if (!match) { pathCache.set(path, null); return null; }
+						output.push(match);
+						base = (base === "/" ? "/" : `${base}/`) + match;
+					}
+					const resolved = `/${output.join("/")}`;
+					pathCache.set(path, resolved);
+					return resolved;
+				};
+				const resolveCase = (path) => {
+					if (typeof path !== "string" || path.startsWith("/")) return findCaseSensitivePath(path);
+					const cwd = FS.cwd();
+					return findCaseSensitivePath((cwd === "/" ? "/" : `${cwd}/`) + path);
+				};
+				const wrapFilesystemMethod = (method) => {
+					const original = FS[method].bind(FS);
+					FS[method] = function (path, ...args) {
+						try { return original(path, ...args); }
+						catch (error) {
+							if (error?.errno !== 44 || typeof path !== "string") throw error;
+							const resolved = resolveCase(path);
+						if (resolved && resolved !== path) return original(resolved, ...args);
+						throw error;
+						}
+					};
+				};
+				["lookupPath", "open", "stat", "lstat", "readdir"].forEach((method) => {
+					if (typeof FS[method] === "function") wrapFilesystemMethod(method);
+				});
+			}, () => {
+				const optionsKey = "scpcb.options";
+				const optionsDirectory = "/Undertow Games/SCP - Containment Breach";
+				const optionsPath = `${optionsDirectory}/options.ini`;
+				const mkdirp = (path) => {
+					let current = "";
+					for (const part of path.split("/").filter(Boolean)) {
+						current += `/${part}`;
+						try { FS.mkdir(current); } catch {}
+					}
+				};
+				try {
+					mkdirp(optionsDirectory);
+					const saved = localStorage.getItem(optionsKey);
+					if (saved) FS.writeFile(optionsPath, saved);
+					const resolution = (text) => {
+						const width = /^width *= *(\d+)/m.exec(text);
+						const height = /^height *= *(\d+)/m.exec(text);
+						return `${width ? width[1] : ""}x${height ? height[1] : ""}`;
+					};
+					let previous = saved || null;
+					let bootResolution = saved ? resolution(saved) : null;
+					setInterval(() => {
+						try {
+							const current = FS.readFile(optionsPath, { encoding: "utf8" });
+							if (bootResolution === null) bootResolution = resolution(current);
+							if (current !== previous) {
+								previous = current;
+								localStorage.setItem(optionsKey, current);
+								if (resolution(current) !== bootResolution) location.reload();
+							}
+						} catch {}
+					}, 1000);
+				} catch {}
+
+				const savesKey = "scpcb.saves";
+				const encodeBase64 = (bytes) => {
+					let binary = "";
+					for (let index = 0; index < bytes.length; index++) binary += String.fromCharCode(bytes[index]);
+					return btoa(binary);
+				};
+				const decodeBase64 = (value) => {
+					const binary = atob(value);
+					const bytes = new Uint8Array(binary.length);
+					for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+					return bytes;
+				};
+				const walkFiles = (directory, output) => {
+					let names;
+					try { names = FS.readdir(directory); } catch { return; }
+					for (const name of names) {
+						if (name === "." || name === "..") continue;
+						const path = `${directory}/${name}`;
+						let mode;
+						try { mode = FS.stat(path).mode; } catch { continue; }
+						if (FS.isDir(mode)) walkFiles(path, output);
+						else if (FS.isFile(mode)) { try { output[path] = encodeBase64(FS.readFile(path)); } catch {} }
+					}
+				};
+				try { FS.mkdir("/Saves"); } catch {}
+				try {
+					const savedTree = localStorage.getItem(savesKey);
+					if (savedTree) {
+						const tree = JSON.parse(savedTree);
+						for (const path in tree) {
+							mkdirp(path.slice(0, path.lastIndexOf("/")));
+							FS.writeFile(path, decodeBase64(tree[path]));
+						}
+					}
+				} catch {}
+				let previousSaves = localStorage.getItem(savesKey) || "";
+				setInterval(() => {
+					try {
+						const output = {};
+						walkFiles("/Saves", output);
+						const serialized = JSON.stringify(output);
+						if (serialized !== previousSaves && serialized !== "{}") {
+							previousSaves = serialized;
+							localStorage.setItem(savesKey, serialized);
+						}
+					} catch {}
+				}, 4000);
+			}],
+		};
+
+		async function fetchWithRetry(url) {
+			let lastError;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				const controller = new AbortController();
+				const timeout = setTimeout(() => controller.abort(), 45000);
+				try {
+					const response = await fetch(url, { cache: "no-cache", signal: controller.signal });
+					if (!response.ok) {
+						const error = new Error(`Request failed (${response.status}): ${url}`);
+						if (response.status !== 429 && response.status < 500) throw error;
+						lastError = error;
+					} else {
+						return await response.arrayBuffer();
+					}
+				} catch (error) {
+					lastError = error;
+					if (error.message.includes("Request failed (4") || attempt === 2) throw error;
+				} finally {
+					clearTimeout(timeout);
+				}
+				await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+			}
+			throw lastError;
+		}
+
+		(async () => {
+			if (!navigator.gpu) {
+				showFailure("This game requires WebGPU. Use a supported browser over HTTPS or localhost.");
+				return;
+			}
+			let adapter;
+			try { adapter = await navigator.gpu.requestAdapter(); } catch {}
+			if (!adapter) {
+				showFailure("WebGPU is available, but no GPU adapter could be acquired on this system.");
+				return;
+			}
+			Module.onAbort = (message) => showFailure(`Startup failed: ${message}`);
+			try {
+				const manifestResponse = await fetchWithRetry("assets.manifest.json");
+				const manifest = JSON.parse(new TextDecoder().decode(manifestResponse));
+				if (!Number.isSafeInteger(manifest.size) || manifest.size <= 0 || !Array.isArray(manifest.parts) || manifest.parts.length === 0) {
+					throw new Error("Asset manifest is invalid.");
+				}
+				const assets = new Uint8Array(manifest.size);
+				let offset = 0;
+				for (const part of manifest.parts) {
+					const chunk = new Uint8Array(await fetchWithRetry(part));
+					if (offset + chunk.length > assets.length) throw new Error("Asset package is larger than the manifest declares.");
+					assets.set(chunk, offset);
+					offset += chunk.length;
+					const percent = Math.floor((offset / manifest.size) * 100);
+					barfill.style.width = `${percent}%`;
+					pctEl.textContent = `${percent}%`;
+				}
+				if (offset !== manifest.size) throw new Error(`Asset package ended early (${offset} of ${manifest.size} bytes).`);
+				Module.getPreloadedPackage = () => assets.buffer;
+			} catch (error) {
+				showFailure(`Failed to load game assets: ${error.message}`);
+				return;
+			}
+
+			const script = document.createElement("script");
+			script.async = true;
+			script.src = new URL("scpcb.js", document.baseURI).href;
+			script.onerror = () => showFailure("Could not load the game runtime script.");
+			document.body.append(script);
+		})();
+	</script>
+</body>
+</html>
